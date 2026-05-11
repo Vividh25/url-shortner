@@ -58,10 +58,15 @@ public class UrlService {
         return new UrlResponse(shortCode, urlRequest.getOriginalUrl(), shortUrl, LocalDateTime.now(), null);
     }
 
-    public String getOriginalUrl(String shortCode) throws Exception {
+    public String getOriginalUrl(String shortCode, String userAgent, String IpAddress) throws Exception {
 
         AnalyticsEvent analyticsEvent = new AnalyticsEvent();
         analyticsEvent.setShortCode(shortCode);
+        analyticsEvent.setIpAddress(IpAddress);
+        analyticsEvent.setUserAgent(userAgent);
+
+        System.out.println("IP: " + IpAddress + "UserAgent: " + userAgent);
+
         analyticsProducer.sendAnalyticsEvent(analyticsEvent);
 
         String cached = template.opsForValue().get(shortCode);

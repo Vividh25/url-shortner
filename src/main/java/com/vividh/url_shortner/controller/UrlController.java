@@ -34,7 +34,8 @@ public class UrlController {
         String IpAddress = httpServletRequest.getRemoteAddr();
         if (!rateLimiterService.isAllowed(IpAddress))
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
-        String url = urlService.getOriginalUrl(shortCode);
+        String userAgent = httpServletRequest.getHeader("User-Agent");
+        String url = urlService.getOriginalUrl(shortCode, userAgent, IpAddress);
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(url));
         return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
