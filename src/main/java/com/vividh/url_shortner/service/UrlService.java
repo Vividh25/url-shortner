@@ -1,18 +1,19 @@
 package com.vividh.url_shortner.service;
 
-import com.vividh.url_shortner.config.RedisConfig;
+import com.vividh.url_shortner.exception.UrlExpiredException;
 import com.vividh.url_shortner.exception.UrlNotFoundException;
 import com.vividh.url_shortner.kafka.AnalyticsProducer;
 import com.vividh.url_shortner.model.AnalyticsEvent;
 import com.vividh.url_shortner.model.Url;
 import com.vividh.url_shortner.model.UrlRequest;
 import com.vividh.url_shortner.model.UrlResponse;
+import com.vividh.url_shortner.repository.AnalyticsEventRepository;
 import com.vividh.url_shortner.repository.UrlRepository;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
+import java.util.List;
 
 @Service
 public class UrlService {
@@ -20,12 +21,19 @@ public class UrlService {
     private final RedisTemplate<String, String> template;
     private final UrlRepository urlRepository;
     private final AnalyticsProducer analyticsProducer;
+    private final AnalyticsEventRepository analyticsEventRepository;
 
-    public UrlService(IdGeneratorService idGeneratorService, RedisTemplate<String, String> template, UrlRepository urlRepository, AnalyticsProducer analyticsProducer) {
+    public UrlService(IdGeneratorService idGeneratorService,
+                      RedisTemplate<String, String> template,
+                      UrlRepository urlRepository,
+                      AnalyticsProducer analyticsProducer,
+                      AnalyticsEventRepository analyticsEventRepository
+    ) {
         this.idGeneratorService = idGeneratorService;
         this.template = template;
         this.urlRepository = urlRepository;
         this.analyticsProducer = analyticsProducer;
+        this.analyticsEventRepository = analyticsEventRepository;
     }
 
     public UrlResponse createShortUrl(UrlRequest urlRequest) {
@@ -43,7 +51,7 @@ public class UrlService {
 
         urlRepository.save(url);
 
-        String shortUrl = "https://localhost:8080/" + shortCode;
+        String shortUrl = "http://localhost:8080/" + shortCode;
 
         template.opsForValue().set(shortCode, urlRequest.getOriginalUrl());
 
@@ -63,9 +71,23 @@ public class UrlService {
         Url url = urlRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException("URL not present in DB"));
 
+        LocalDateTime expireTime = url.getExpiresAt();
+        if (expireTime != null && expireTime.isBefore(LocalDateTime.now())) {
+            throw new UrlExpiredException("Url is expired");
+        }
+
+        long clickCount = url.getClickCount();
+        clickCount++;
+        url.setClickCount(clickCount);
+        urlRepository.save(url);
+
         template.opsForValue().set(shortCode, url.getOriginalUrl());
         return url.getOriginalUrl();
 
+    }
+
+    public List<AnalyticsEvent> getAnalytics(String shortCode) {
+        return analyticsEventRepository.findByShortCode(shortCode);
     }
 
 }
