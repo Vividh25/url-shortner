@@ -9,6 +9,7 @@ import com.vividh.url_shortner.model.UrlRequest;
 import com.vividh.url_shortner.model.UrlResponse;
 import com.vividh.url_shortner.repository.AnalyticsEventRepository;
 import com.vividh.url_shortner.repository.UrlRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -93,6 +94,19 @@ public class UrlService {
 
     public List<AnalyticsEvent> getAnalytics(String shortCode) {
         return analyticsEventRepository.findByShortCode(shortCode);
+    }
+
+    public List<UrlResponse> getAllUrls() {
+        List<Url> urls = urlRepository.findAll();
+        return urls.stream()
+                .map(url -> new UrlResponse(url.getShortCode(), url.getOriginalUrl(), "http://localhost:8080/" + url.getShortCode(), url.getCreatedAt(), url.getExpiresAt()))
+                .toList();
+    }
+
+    @Transactional
+    public void deleteUrlByShortCode(String shortCode) {
+        urlRepository.deleteByShortCode(shortCode);
+        template.delete(shortCode);
     }
 
 }
